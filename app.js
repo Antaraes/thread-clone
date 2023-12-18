@@ -5,8 +5,8 @@ const bodyParser = require("body-parser");
 const ErrorHandler = require("./middleware/error");
 app.use(express.json());
 app.use(cookieParser());
-app.use(bodyParser.urlencoded({ extended: true, limit: "50mb" }));
-app.use(express.urlencoded({ limit: "50mb", extended: true }));
+app.use(bodyParser.urlencoded({ extended: true, limit: "500mb" }));
+app.use(express.urlencoded({ limit: "1000mb", extended: true }));
 
 // config
 if (process.env.NODE_ENV !== "PRODUCTION") {

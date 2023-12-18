@@ -4,24 +4,39 @@ const catchAsyncErrors = require("../middleware/catchAsyncErrors");
 const sendToken = require("../utils/jwtToken.js");
 const cloudinary = require("cloudinary");
 const Notification = require("../models/NotificationModel");
+const admin = require("firebase-admin");
+var serviceAccount = require("../config/serviceAccountKey.json");
+
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount),
+  storageBucket: "gs://thread-2fca0.appspot.com/user",
+});
 
 // Register user
 exports.createUser = catchAsyncErrors(async (req, res, next) => {
+  console.log("Register");
   try {
     const { name, email, password, avatar } = req.body;
-
+    if (!name) {
+      return res.status(400).json({ success: false, message: "Name is required" });
+    }
     let user = await User.findOne({ email });
     if (user) {
-      return res
-        .status(400)
-        .json({ success: false, message: "User already exists" });
+      return res.status(400).json({ success: false, message: "User already exists" });
     }
 
-    let myCloud;
-
+    let avatarURL = null;
     if (avatar) {
-      myCloud = await cloudinary.v2.uploader.upload(avatar, {
-        folder: "avatars",
+      const bucket = admin.storage().bucket();
+      const avatarFileName = `avatars/${Date.now()}_${Math.floor(Math.random() * 1000)}_${name}`;
+      const avatarFile = bucket.file(avatarFileName);
+      await avatarFile.save(Buffer.from(avatar, "base64"), {
+        contentType: "image/jpeg",
+      });
+
+      avatarURL = await avatarFile.getSignedUrl({
+        action: "read",
+        expires: "01-01-2100",
       });
     }
 
@@ -34,9 +49,7 @@ exports.createUser = catchAsyncErrors(async (req, res, next) => {
       email,
       password,
       userName: userNameWithoutSpace + uniqueNumber,
-      avatar: avatar
-        ? { public_id: myCloud.public_id, url: myCloud.secure_url }
-        : null,
+      avatar: avatarURL,
     });
 
     sendToken(user, 201, res);
@@ -59,16 +72,12 @@ exports.loginUser = catchAsyncErrors(async (req, res, next) => {
   const user = await User.findOne({ email }).select("+password");
 
   if (!user) {
-    return next(
-      new ErrorHandler("User is not find with this email & password", 401)
-    );
+    return next(new ErrorHandler("User is not find with this email & password", 401));
   }
   const isPasswordMatched = await user.comparePassword(password);
 
   if (!isPasswordMatched) {
-    return next(
-      new ErrorHandler("User is not find with this email & password", 401)
-    );
+    return next(new ErrorHandler("User is not find with this email & password", 401));
   }
 
   sendToken(user, 201, res);
@@ -117,9 +126,7 @@ exports.followUnfollowUser = catchAsyncErrors(async (req, res, next) => {
     const loggedInUser = req.user;
     const { followUserId } = req.body;
 
-    const isFollowedBefore = loggedInUser.following.find(
-      (item) => item.userId === followUserId
-    );
+    const isFollowedBefore = loggedInUser.following.find((item) => item.userId === followUserId);
     const loggedInUserId = loggedInUser._id;
 
     if (isFollowedBefore) {
@@ -174,9 +181,7 @@ exports.followUnfollowUser = catchAsyncErrors(async (req, res, next) => {
 // get user notification
 exports.getNotification = catchAsyncErrors(async (req, res, next) => {
   try {
-    const notifications = await Notification.find({ userId: req.user.id }).sort(
-      { createdAt: -1 }
-    );
+    const notifications = await Notification.find({ userId: req.user.id }).sort({ createdAt: -1 });
 
     res.status(201).json({
       success: true,
