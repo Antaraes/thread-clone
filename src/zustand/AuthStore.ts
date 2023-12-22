@@ -3,14 +3,22 @@ import {create} from 'zustand';
 interface AuthState {
   isAuthenticated: boolean;
   isLoading: boolean;
+  user: object | User;
   setAuth: () => void;
+  setUser: (userData: object) => void;
+  startLoading: () => void;
+  stopLoading: () => void;
   logout: () => void;
 }
 
 const useAuthStore = create<AuthState>(set => ({
   isAuthenticated: false,
   isLoading: true,
+  user: {},
   setAuth: () => set(state => ({...state, isAuthenticated: true})),
+  setUser: userData => set(state => ({...state, user: userData})),
+  startLoading: () => set({isLoading: true}),
+  stopLoading: () => set({isLoading: false}),
   logout: () => set(state => ({...state, isAuthenticated: false})),
 }));
 

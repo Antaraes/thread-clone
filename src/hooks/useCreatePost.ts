@@ -14,26 +14,18 @@ import {zodResolver} from '@hookform/resolvers/zod';
 import {ToastAndroid} from 'react-native';
 
 import {QueryClient, useMutation, useQueryClient} from 'react-query';
-import {Login} from '@/api';
+import {CreatePost, Login} from '@/api';
 import {storage} from '@/zustand/MMKV';
+import {PostSchema} from '@/utils/validation/post';
 
 interface useLoginProps {}
 
-const useLoginMutation = () => {
-  const queryClient = useQueryClient();
-  return useMutation((data: LoginSchema) => Login(data), {
-    onSuccess: response => {
-      const userData = response?.data;
-      if (userData) {
-        queryClient.setQueryData('user', userData);
-      }
-    },
-  });
+type FormField = {
+  posts: z.infer<typeof PostSchema>;
 };
-type FormField = z.infer<typeof LoginSchema>;
-const useLogin = (
+const useCreatePost = (
   navigation: CompositeNavigationProp<
-    NativeStackNavigationProp<AuthStackParamList, 'LoginScreen', undefined>,
+    NativeStackNavigationProp<AppStackParamList, 'CreatePostScreen', undefined>,
     NativeStackNavigationProp<
       RootStackParamList,
       keyof RootStackParamList,
@@ -45,33 +37,40 @@ const useLogin = (
   const queryClient = useQueryClient();
   const {control, handleSubmit, reset} = useForm<FormField>({
     defaultValues: {
-      email: '',
-      password: '',
+      posts: [
+        {
+          title: '',
+          image: '',
+          user: {
+            email: '',
+            password: '',
+            name: '',
+            avatar: '',
+          },
+        },
+      ],
     },
-    resolver: zodResolver(LoginSchema),
+    resolver: zodResolver(PostSchema),
   });
 
-  const mutation = useMutation((data: LoginSchema) => Login(data), {
+  const mutation = useMutation((data: FormField) => CreatePost(data.posts), {
     onSuccess: async response => {
       startLoading();
-      setUser(response.data);
-      console.log(response.data.token);
-      await storage.set('user', JSON.stringify(response.data));
+
       await ToastAndroid.showWithGravity(
-        'Login Success',
+        'Create Post Success',
         ToastAndroid.LONG,
         ToastAndroid.BOTTOM,
       );
+      navigation.navigate('AppScreen', {screen: 'HomeScreen'});
       reset();
-      setAuth();
-      navigation.navigate('AppScreen', {screen: 'ProfileScreen'});
       stopLoading();
     },
     onError: async error => {
       stopLoading();
       console.log(error);
       await ToastAndroid.showWithGravity(
-        'Login Failed',
+        'Create Post Failed',
         ToastAndroid.LONG,
         ToastAndroid.BOTTOM,
       );
@@ -93,4 +92,4 @@ const useLogin = (
   };
 };
 
-export default useLogin;
+export default useCreatePost;
