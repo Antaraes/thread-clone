@@ -1,16 +1,18 @@
 const User = require("../models/UserModel");
+const bcrypt = require("bcryptjs");
 const ErrorHandler = require("../utils/ErrorHandler.js");
 const catchAsyncErrors = require("../middleware/catchAsyncErrors");
 const sendToken = require("../utils/jwtToken.js");
+const fs = require("fs");
 const cloudinary = require("cloudinary");
+const jwt = require("jsonwebtoken");
 const Notification = require("../models/NotificationModel");
 const admin = require("firebase-admin");
+const Jimp = require("jimp");
 var serviceAccount = require("../config/serviceAccountKey.json");
+const { myAdmin } = require("../config/firebase.js");
 
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount),
-  storageBucket: "gs://thread-2fca0.appspot.com/user",
-});
+var bucket = myAdmin.storage().bucket();
 
 // Register user
 exports.createUser = catchAsyncErrors(async (req, res, next) => {
@@ -25,62 +27,132 @@ exports.createUser = catchAsyncErrors(async (req, res, next) => {
       return res.status(400).json({ success: false, message: "User already exists" });
     }
 
-    let avatarURL = null;
-    if (avatar) {
-      const bucket = admin.storage().bucket();
-      const avatarFileName = `avatars/${Date.now()}_${Math.floor(Math.random() * 1000)}_${name}`;
-      const avatarFile = bucket.file(avatarFileName);
-      await avatarFile.save(Buffer.from(avatar, "base64"), {
-        contentType: "image/jpeg",
-      });
-
-      avatarURL = await avatarFile.getSignedUrl({
-        action: "read",
-        expires: "01-01-2100",
-      });
-    }
-
     const userNameWithoutSpace = name.replace(/\s/g, "");
 
     const uniqueNumber = Math.floor(Math.random() * 1000);
+    let avatarURL = null;
+    if (avatar) {
+      try {
+        // Read the contents of the file
+        // const imageBuffer = fs.readFileSync(avatar);
+        const imageBuffer = Buffer.from(avatar, "base64");
+        // Generate a unique filename for the avatar
+        const avatarFileName = `${
+          userNameWithoutSpace + uniqueNumber
+        }/profile/${Date.now()}_${Math.floor(Math.random() * 1000)}_${name}.jpg`;
+        const avatarFile = bucket.file(avatarFileName);
+
+        // Upload the buffer to the bucket
+        await avatarFile.save(imageBuffer, {
+          metadata: {
+            contentType: "image/jpeg", // Set the content type based on your image type
+          },
+        });
+        avatarURL = await avatarFile.getSignedUrl({
+          action: "read",
+          expires: "01-01-2100",
+        });
+        console.log(avatarURL);
+      } catch (error) {
+        // Handle the error or return an appropriate response
+        console.log(error);
+        return res.status(500).json({ success: false, message: "Error uploading avatar" });
+      }
+    }
+    console.log(avatarURL[0]);
 
     user = await User.create({
       name,
       email,
       password,
       userName: userNameWithoutSpace + uniqueNumber,
-      avatar: avatarURL,
+      avatar: avatarURL[0],
     });
 
     sendToken(user, 201, res);
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: error.message,
-    });
+    res.json({ success: false, message: error.message });
   }
 });
 
 // Login User
+const messages = {
+  usernameNotExist: "Username is not found. Invalid login credentials.",
+  wrongRole: "Please make sure this is your identity.",
+  loginSuccess: "You are successfully logged in.",
+  wrongPassword: "Incorrect password.",
+  loginError: "Oops! Something went wrong.",
+};
 exports.loginUser = catchAsyncErrors(async (req, res, next) => {
-  const { email, password } = req.body;
+  try {
+    const { email, password } = req.body;
+    let foundUser;
+    console.log("email: " + email + " password: " + password);
+    foundUser = await User.findOne({ email: email });
 
-  if (!email || !password) {
-    return next(new ErrorHandler("Please enter the email & password", 400));
+    if (!foundUser) {
+      return res.status(404).json({
+        reason: "User not found",
+        message: messages.usernameNotExist,
+        success: false,
+      });
+    }
+
+    const match = await bcrypt.compare(password, foundUser.password);
+    if (match) {
+      const accessToken = jwt.sign(
+        {
+          user: foundUser,
+        },
+        process.env.JWT_SECRET_KEY,
+        {
+          expiresIn: "1d",
+        }
+      );
+      const refreshToken = jwt.sign({ user: foundUser }, process.env.JWT_SECRET_KEY, {
+        expiresIn: "5d",
+      });
+      res.cookie("refreshToken", refreshToken, {
+        httpOnly: true,
+        sameSite: "None",
+        secure: true,
+        maxAge: 24 * 60 * 60 * 1000,
+      });
+      res.cookie("accessToken", accessToken, { httpOnly: true, sameSite: "None", secure: true });
+
+      const result = {
+        user: {
+          ...foundUser._doc,
+        },
+        accessToken: `${accessToken}`,
+        refreshToken: refreshToken,
+        expiresIn: "30s",
+      };
+      return res.status(200).json({
+        ...result,
+        message: messages.loginSuccess,
+        success: true,
+      });
+    } else {
+      return res.status(403).json({
+        reason: "password",
+        message: messages.wrongPassword,
+        success: false,
+      });
+    }
+  } catch (error) {
+    console.log(error);
+    let errorMsg = messages.loginError;
+    if (error.isJoi === true) {
+      error.status = 403;
+      errorMsg = error.message;
+    }
+    return res.status(500).json({
+      reason: "server",
+      message: errorMsg,
+      success: false,
+    });
   }
-
-  const user = await User.findOne({ email }).select("+password");
-
-  if (!user) {
-    return next(new ErrorHandler("User is not find with this email & password", 401));
-  }
-  const isPasswordMatched = await user.comparePassword(password);
-
-  if (!isPasswordMatched) {
-    return next(new ErrorHandler("User is not find with this email & password", 401));
-  }
-
-  sendToken(user, 201, res);
 });
 
 //  Log out user

@@ -3,50 +3,53 @@ const ErrorHandler = require("../utils/ErrorHandler.js");
 const catchAsyncErrors = require("../middleware/catchAsyncErrors");
 const cloudinary = require("cloudinary");
 const Notification = require("../models/NotificationModel");
+const { myAdmin } = require("../config/firebase.js");
+const { getUserFromToken } = require("../helper/index.js");
+
+var bucket = myAdmin.storage().bucket();
 
 // create post
 exports.createPost = catchAsyncErrors(async (req, res, next) => {
+  console.log("createPost");
   try {
-    const { image } = req.body;
+    const user = await getUserFromToken(req);
+    console.log(user);
+    const posts = req.body;
 
-    let myCloud;
+    let successPosts = [];
 
-    if (image) {
-      myCloud = await cloudinary.v2.uploader.upload(image, {
-        folder: "posts",
-      });
-    }
+    for (const item of posts) {
+      let postImageURL = null;
 
-    let replies = req.body.replies.map((item) => {
       if (item.image) {
-        const replyImage = cloudinary.v2.uploader.upload(item.image, {
-          folder: "posts",
+        const postImageBuffer = Buffer.from(item.image, "base64");
+        const postFilename = `${user.userName}/posts/${Date.now()}_${Math.floor(
+          Math.random() * 1000
+        )}.jpg`;
+        const postFile = bucket.file(postFilename);
+        await postFile.save(postImageBuffer, {
+          metadata: {
+            contentType: "image/jpeg",
+          },
         });
-        item.image = {
-          public_id: replyImage.public_id,
-          url: replyImage.secure_url,
-        };
+
+        postImageURL = await postFile.getSignedUrl({ action: "read", expires: "01-01-2100" });
+        console.log(postImageURL);
       }
-      return item;
-    });
 
-    const post = new Post({
-      title: req.body.title,
-      image: image
-        ? {
-            public_id: myCloud.public_id,
-            url: myCloud.secure_url,
-          }
-        : null,
-      user: req.body.user,
-      replies,
-    });
+      const post = new Post({
+        title: item.title,
+        image: postImageURL[0],
+        user: user._id,
+      });
 
-    await post.save();
+      successPosts.push(post);
+      await post.save();
+    }
 
     res.status(201).json({
       success: true,
-      post,
+      successPosts,
     });
   } catch (error) {
     return next(new ErrorHandler(error.message, 400));
@@ -56,9 +59,11 @@ exports.createPost = catchAsyncErrors(async (req, res, next) => {
 // get all posts
 exports.getAllPosts = catchAsyncErrors(async (req, res, next) => {
   try {
-    const posts = await Post.find().sort({
-      createdAt: -1,
-    });
+    const posts = await Post.find()
+      .sort({
+        createdAt: -1,
+      })
+      .populate("user", ["email", "name", "avatar"]);
 
     res.status(201).json({ success: true, posts });
   } catch (error) {
@@ -73,9 +78,7 @@ exports.updateLikes = catchAsyncErrors(async (req, res, next) => {
 
     const post = await Post.findById(postId);
 
-    const isLikedBefore = post.likes.find(
-      (item) => item.userId === req.user.id
-    );
+    const isLikedBefore = post.likes.find((item) => item.userId === req.user.id);
 
     if (isLikedBefore) {
       await Post.findByIdAndUpdate(postId, {
@@ -203,9 +206,7 @@ exports.updateReplyLikes = catchAsyncErrors(async (req, res, next) => {
     }
 
     // Find the reply in the 'replies' array based on the given replyId
-    const reply = post.replies.find(
-      (reply) => reply._id.toString() === replyId
-    );
+    const reply = post.replies.find((reply) => reply._id.toString() === replyId);
 
     if (!reply) {
       return res.status(404).json({
@@ -214,9 +215,7 @@ exports.updateReplyLikes = catchAsyncErrors(async (req, res, next) => {
       });
     }
 
-    const isLikedBefore = reply.likes.find(
-      (item) => item.userId === req.user.id
-    );
+    const isLikedBefore = reply.likes.find((item) => item.userId === req.user.id);
 
     if (isLikedBefore) {
       // If liked before, remove the like from the reply.likes array
@@ -346,9 +345,7 @@ exports.updateRepliesReplyLike = catchAsyncErrors(async (req, res, next) => {
     }
 
     // Find the reply in the 'replies' array based on the given replyId
-    const replyObject = post.replies.find(
-      (reply) => reply._id.toString() === replyId
-    );
+    const replyObject = post.replies.find((reply) => reply._id.toString() === replyId);
 
     if (!replyObject) {
       return res.status(404).json({
@@ -358,9 +355,7 @@ exports.updateRepliesReplyLike = catchAsyncErrors(async (req, res, next) => {
     }
 
     // Find the specific 'reply' object inside 'replyObject.reply' based on the given replyId
-    const reply = replyObject.reply.find(
-      (reply) => reply._id.toString() === singleReplyId
-    );
+    const reply = replyObject.reply.find((reply) => reply._id.toString() === singleReplyId);
 
     if (!reply) {
       return res.status(404).json({
@@ -370,9 +365,7 @@ exports.updateRepliesReplyLike = catchAsyncErrors(async (req, res, next) => {
     }
 
     // Check if the user has already liked the reply
-    const isLikedBefore = reply.likes.some(
-      (like) => like.userId === req.user.id
-    );
+    const isLikedBefore = reply.likes.some((like) => like.userId === req.user.id);
 
     if (isLikedBefore) {
       // If liked before, remove the like from the reply.likes array
@@ -435,11 +428,11 @@ exports.deletePost = catchAsyncErrors(async (req, res, next) => {
       return next(new ErrorHandler("Post is not found with this id", 404));
     }
 
-   if(post.image?.public_id){
-    await cloudinary.v2.uploader.destroy(post.image.public_id);
-   }
+    if (post.image?.public_id) {
+      await cloudinary.v2.uploader.destroy(post.image.public_id);
+    }
 
-   await Post.deleteOne({_id: req.params.id});
+    await Post.deleteOne({ _id: req.params.id });
 
     res.status(201).json({
       success: true,

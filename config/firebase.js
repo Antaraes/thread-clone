@@ -1,7 +1,10 @@
 var admin = require("firebase-admin");
 
-var serviceAccount = require(".serviceAccountKey.json");
+const serviceAccount = require("./serviceAccountKey.json");
 
-admin.initializeApp({
+const myAdmin = admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
+  storageBucket: "gs://thread-2fca0.appspot.com",
 });
+
+module.exports = { myAdmin };

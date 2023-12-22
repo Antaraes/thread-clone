@@ -6,15 +6,11 @@ const postSchema = new mongoose.Schema(
       type: String,
     },
     image: {
-      public_id: {
-        type: String,
-      },
-      url: {
-        type: String,
-      },
+      type: String,
     },
     user: {
-      type: Object,
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
     },
     likes: [
       {

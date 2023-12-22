@@ -2,7 +2,6 @@ const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 
-
 const userSchema = new mongoose.Schema(
   {
     name: {
@@ -24,14 +23,7 @@ const userSchema = new mongoose.Schema(
       required: [true, "Please enter your password"],
     },
     avatar: {
-      public_id: {
-        type: String,
-        required: [true, "Please upload one profile picture"],
-      },
-      url: {
-        type: String,
-        required: [true, "Please upload one profile picture"],
-      },
+      type: String,
     },
     followers: [
       {
@@ -66,7 +58,7 @@ userSchema.methods.getJwtToken = function () {
   });
 };
 
-// compare password 
+// compare password
 userSchema.methods.comparePassword = async function (enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
 };

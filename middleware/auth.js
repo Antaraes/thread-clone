@@ -4,13 +4,29 @@ const jwt = require("jsonwebtoken");
 const User = require("../models/UserModel.js");
 
 exports.isAuthenticatedUser = catchAsyncErrors(async (req, res, next) => {
-  const authHeader = req.headers.authorization;
-  if(!authHeader || authHeader === 'Bearer undefined' || !authHeader.startsWith("Bearer ")){
-    return next(new ErrorHandler("Please login to continue",401));
-  }
+  const token = req.cookies.accessToken || req.headers.authorization.split(" ")[1];
+  console.log(token);
 
-  const token = authHeader.split(" ")[1];
-  const decoded = jwt.verify(token, process.env.JWT_SECRET_KEY);
-  req.user = await User.findById(decoded.id);
-  next();
+  try {
+    const decode = jwt.verify(token, process.env.JWT_SECRET_KEY);
+    const user = await User.findById(decode.user._id);
+    if (!user) {
+      return res.json({ success: false, message: "Unauthorized access!" });
+    }
+
+    req.user = user;
+    next();
+  } catch (error) {
+    if (error.name === "JsonWebTokenError") {
+      return res.json({ success: false, message: "Unauthorized access!" });
+    }
+    if (error.name === "TokenExpiredError") {
+      return res.json({
+        success: false,
+        message: "Session expired, try signing in again!",
+      });
+    }
+
+    res.json({ success: false, message: "Internal server error!" });
+  }
 });
