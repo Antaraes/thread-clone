@@ -22,25 +22,26 @@ const PostScreen: React.FC<Props> = ({navigation, route}) => {
   const {setAuth, setUser, startLoading, stopLoading, user} = useAuthStore();
   const {colorScheme} = useColorScheme();
   const [activeIndex, setActiveIndex] = useState(0);
+  console.log(user);
   const [post, setPost] = useState<Post[]>([
     {
       title: '',
       previewImage: '',
       image: '',
-      user: user.user,
+      user: user,
     },
   ]);
   console.log(activeIndex);
+  console.log(user);
   const uploadImage = async (index: number) => {
     try {
       const image = await ImageCropPicker.openPicker({
         width: 200,
-        height: 300,
+        height: 200,
         cropping: true,
-        compressImageQuality: 1,
+        compressImageQuality: 0.5,
         includeBase64: true,
       });
-      console.log(image.path);
       if (image) {
         setPost(prevPost => {
           const updatedPost = [...prevPost];
@@ -140,7 +141,7 @@ const PostScreen: React.FC<Props> = ({navigation, route}) => {
             <View className="mt-3 flex-row bg-white dark:bg-black">
               <Image
                 source={{
-                  uri: item
+                  uri: item.user.avatar
                     ? item.user.avatar
                     : 'https://cdn-icons-png.flaticon.com/128/568/568717.png',
                 }}
@@ -210,7 +211,7 @@ const PostScreen: React.FC<Props> = ({navigation, route}) => {
                 } items-center `}>
                 <Image
                   source={{
-                    uri: item
+                    uri: item.user.avatar
                       ? item.user.avatar
                       : 'https://cdn-icons-png.flaticon.com/128/568/568717.png',
                   }}

@@ -53,10 +53,9 @@ const useCreatePost = (
     resolver: zodResolver(PostSchema),
   });
 
-  const mutation = useMutation((data: FormField) => CreatePost(data.posts), {
+  const mutation = useMutation((data: FormField[]) => CreatePost(data.posts), {
     onSuccess: async response => {
       startLoading();
-
       await ToastAndroid.showWithGravity(
         'Create Post Success',
         ToastAndroid.LONG,

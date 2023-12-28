@@ -17,14 +17,6 @@ type Props = {};
 const Tab = createBottomTabNavigator<AppStackParamList>();
 const Stack = createNativeStackNavigator<AppStackParamList>();
 
-const ProfileStack = () => {
-  return (
-    <Stack.Navigator>
-      <Stack.Screen name="ProfileScreen" component={ProfileScreen} />
-    </Stack.Navigator>
-  );
-};
-
 const TabStackNavigator: React.FC<Props> = props => {
   const {colorScheme} = useColorScheme();
   return (
@@ -78,6 +70,7 @@ const TabStackNavigator: React.FC<Props> = props => {
               focused={focused}
             />
           ),
+          tabBarVisible: false,
         })}
       />
       <Tab.Screen
@@ -94,7 +87,7 @@ const TabStackNavigator: React.FC<Props> = props => {
       />
       <Tab.Screen
         name="ProfileScreen"
-        component={ProfileStack}
+        component={ProfileScreen}
         options={({route}) => ({
           tabBarIcon: ({focused}) => (
             <TabIcon

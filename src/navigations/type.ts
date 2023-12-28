@@ -7,6 +7,7 @@ import {NativeStackScreenProps} from '@react-navigation/native-stack';
 export type RootStackParamList = {
   AppScreen: NavigatorScreenParams<AppStackParamList>;
   AuthScreen: NavigatorScreenParams<AuthStackParamList>;
+  SettingScreen: undefined;
 };
 
 export type AppStackParamList = {

@@ -10,6 +10,7 @@ import TabStackNavigator from './TabStackNavigator';
 import {storage} from '@/zustand/MMKV';
 import ProfileScreen from '@/screens/ProfileScreen';
 import PostScreen from '@/screens/PostScreen';
+import SettingScreen from '@/screens/SettingScreen';
 
 const AppStackNavigator = () => {
   const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -24,7 +25,10 @@ const AppStackNavigator = () => {
         headerShown: false,
       }}>
       {user ? (
-        <Stack.Screen name="AppScreen" component={TabStackNavigator} />
+        <>
+          <Stack.Screen name="AppScreen" component={TabStackNavigator} />
+          <Stack.Screen name="SettingScreen" component={SettingScreen} />
+        </>
       ) : (
         <Stack.Screen name="AuthScreen" component={AuthStackNavigator} />
       )}
