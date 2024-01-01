@@ -11,6 +11,7 @@ const admin = require("firebase-admin");
 const Jimp = require("jimp");
 var serviceAccount = require("../config/serviceAccountKey.json");
 const { myAdmin } = require("../config/firebase.js");
+const { getUserFromToken } = require("../helper/index.js");
 
 var bucket = myAdmin.storage().bucket();
 
@@ -33,19 +34,16 @@ exports.createUser = catchAsyncErrors(async (req, res, next) => {
     let avatarURL = null;
     if (avatar) {
       try {
-        // Read the contents of the file
-        // const imageBuffer = fs.readFileSync(avatar);
         const imageBuffer = Buffer.from(avatar, "base64");
-        // Generate a unique filename for the avatar
+
         const avatarFileName = `${
           userNameWithoutSpace + uniqueNumber
         }/profile/${Date.now()}_${Math.floor(Math.random() * 1000)}_${name}.jpg`;
         const avatarFile = bucket.file(avatarFileName);
 
-        // Upload the buffer to the bucket
         await avatarFile.save(imageBuffer, {
           metadata: {
-            contentType: "image/jpeg", // Set the content type based on your image type
+            contentType: "image/jpeg",
           },
         });
         avatarURL = await avatarFile.getSignedUrl({
@@ -54,7 +52,6 @@ exports.createUser = catchAsyncErrors(async (req, res, next) => {
         });
         console.log(avatarURL);
       } catch (error) {
-        // Handle the error or return an appropriate response
         console.log(error);
         return res.status(500).json({ success: false, message: "Error uploading avatar" });
       }
@@ -67,10 +64,13 @@ exports.createUser = catchAsyncErrors(async (req, res, next) => {
       password,
       userName: userNameWithoutSpace + uniqueNumber,
       avatar: avatarURL[0],
+      followers: [],
+      following: [],
     });
 
     sendToken(user, 201, res);
   } catch (error) {
+    console.log(error);
     res.json({ success: false, message: error.message });
   }
 });
@@ -172,7 +172,8 @@ exports.logoutUser = catchAsyncErrors(async (req, res, next) => {
 
 //  Get user Details
 exports.userDetails = catchAsyncErrors(async (req, res, next) => {
-  const user = await User.findById(req.user.id);
+  const loggedInuser = await getUserFromToken(req);
+  const user = await User.findById(loggedInuser._id);
   res.status(200).json({
     success: true,
     user,
@@ -181,8 +182,8 @@ exports.userDetails = catchAsyncErrors(async (req, res, next) => {
 
 // get all users
 exports.getAllUsers = catchAsyncErrors(async (req, res, next) => {
-  const loggedInuser = req.user.id;
-  const users = await User.find({ _id: { $ne: loggedInuser } }).sort({
+  const loggedInuser = await getUserFromToken(req);
+  const users = await User.find({ _id: { $ne: loggedInuser._id } }).sort({
     createdAt: -1,
   });
 
@@ -192,57 +193,60 @@ exports.getAllUsers = catchAsyncErrors(async (req, res, next) => {
   });
 });
 
-// Follow and unfollow user
 exports.followUnfollowUser = catchAsyncErrors(async (req, res, next) => {
   try {
-    const loggedInUser = req.user;
-    const { followUserId } = req.body;
+    const loggedInUser = await getUserFromToken(req);
+    const { userId } = req.body;
+    console.log(req.body);
 
-    const isFollowedBefore = loggedInUser.following.find((item) => item.userId === followUserId);
+    const isFollowedBefore = loggedInUser.following.some((item) => item.userId === userId);
+
+    console.log("userid", userId);
+    console.log("isFollowedBefore", isFollowedBefore);
     const loggedInUserId = loggedInUser._id;
 
     if (isFollowedBefore) {
-      await User.updateOne(
-        { _id: followUserId },
-        { $pull: { followers: { userId: loggedInUserId } } }
-      );
+      console.log("Unfollowing");
+      // Unfollow logic
+      await User.updateOne({ _id: userId }, { $pull: { followers: { userId: loggedInUserId } } });
 
-      await User.updateOne(
-        { _id: loggedInUserId },
-        { $pull: { following: { userId: followUserId } } }
-      );
+      await User.updateOne({ _id: loggedInUserId }, { $pull: { following: { userId: userId } } });
 
-      await Notification.deleteOne({
+      await Notification.deleteMany({
         "creator._id": loggedInUserId,
-        userId: followUserId,
+        userId: userId,
         type: "Follow",
+      });
+
+      await Notification.create({
+        creator: req.user,
+        type: "unFollow",
+        title: "unFollowed you",
+        userId: userId,
       });
 
       res.status(200).json({
         success: true,
         message: "User unfollowed successfully",
+        user: await getUserFromToken(req),
       });
     } else {
-      await User.updateOne(
-        { _id: followUserId },
-        { $push: { followers: { userId: loggedInUserId } } }
-      );
+      // Follow logic
+      await User.updateOne({ _id: userId }, { $push: { followers: { userId: loggedInUserId } } });
 
-      await User.updateOne(
-        { _id: loggedInUserId },
-        { $push: { following: { userId: followUserId } } }
-      );
+      await User.updateOne({ _id: loggedInUserId }, { $push: { following: { userId: userId } } });
 
       await Notification.create({
         creator: req.user,
         type: "Follow",
         title: "Followed you",
-        userId: followUserId,
+        userId: userId,
       });
 
       res.status(200).json({
         success: true,
         message: "User followed successfully",
+        user: await getUserFromToken(req),
       });
     }
   } catch (error) {
@@ -253,7 +257,12 @@ exports.followUnfollowUser = catchAsyncErrors(async (req, res, next) => {
 // get user notification
 exports.getNotification = catchAsyncErrors(async (req, res, next) => {
   try {
-    const notifications = await Notification.find({ userId: req.user.id }).sort({ createdAt: -1 });
+    const loggedInUser = await getUserFromToken(req);
+    const notifications = await Notification.find({ userId: loggedInUser._id })
+      .populate("userId")
+      .sort({
+        createdAt: -1,
+      });
 
     res.status(201).json({
       success: true,

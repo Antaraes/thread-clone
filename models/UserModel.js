@@ -28,14 +28,20 @@ const userSchema = new mongoose.Schema(
     followers: [
       {
         userId: {
-          type: String,
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "User",
+          unique: true,
+          require: false,
         },
       },
     ],
     following: [
       {
         userId: {
-          type: String,
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "User",
+          unique: true,
+          require: false,
         },
       },
     ],
@@ -43,6 +49,8 @@ const userSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+userSchema.index({ "followers.userId": 1 }, { unique: true, sparse: true });
+userSchema.index({ "following.userId": 1 }, { unique: true, sparse: true });
 // Hash password
 userSchema.pre("save", async function (next) {
   if (!this.isModified("password")) {

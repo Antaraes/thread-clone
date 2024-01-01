@@ -8,20 +8,25 @@ const { getUserFromToken } = require("../helper/index.js");
 
 var bucket = myAdmin.storage().bucket();
 
-// create post
 exports.createPost = catchAsyncErrors(async (req, res, next) => {
   console.log("createPost");
   try {
     const user = await getUserFromToken(req);
     console.log(user);
-    const posts = req.body;
+    const { posts } = req.body;
+    console.log(posts);
+
+    if (!Array.isArray(posts) || posts.length === 0) {
+      return next(new ErrorHandler("Invalid or empty posts data", 400));
+    }
 
     let successPosts = [];
 
     for (const item of posts) {
       let postImageURL = null;
+      console.log(item);
 
-      if (item.image) {
+      if (item.image && item.image !== "") {
         const postImageBuffer = Buffer.from(item.image, "base64");
         const postFilename = `${user.userName}/posts/${Date.now()}_${Math.floor(
           Math.random() * 1000
@@ -39,7 +44,7 @@ exports.createPost = catchAsyncErrors(async (req, res, next) => {
 
       const post = new Post({
         title: item.title,
-        image: postImageURL[0],
+        image: postImageURL ? postImageURL[0] : null,
         user: user._id,
       });
 
@@ -76,23 +81,24 @@ exports.updateLikes = catchAsyncErrors(async (req, res, next) => {
   try {
     const postId = req.body.postId;
 
+    const loggedInUser = await getUserFromToken(req);
     const post = await Post.findById(postId);
 
-    const isLikedBefore = post.likes.find((item) => item.userId === req.user.id);
+    const isLikedBefore = post.likes.find((item) => item.userId === loggedInUser._id);
 
     if (isLikedBefore) {
       await Post.findByIdAndUpdate(postId, {
         $pull: {
           likes: {
-            userId: req.user.id,
+            userId: loggedInUser._id,
           },
         },
       });
 
-      if (req.user.id !== post.user._id) {
+      if (loggedInUser._id !== post.user) {
         await Notification.deleteOne({
-          "creator._id": req.user.id,
-          userId: post.user._id,
+          "creator._id": loggedInUser._id,
+          userId: post.user,
           type: "Like",
         });
       }
@@ -107,22 +113,19 @@ exports.updateLikes = catchAsyncErrors(async (req, res, next) => {
         {
           $push: {
             likes: {
-              name: req.user.name,
-              userName: req.user.userName,
-              userId: req.user.id,
-              userAvatar: req.user.avatar.url,
+              user: loggedInUser._id,
               postId,
             },
           },
         }
       );
 
-      if (req.user.id !== post.user._id) {
+      if (loggedInUser._id !== post.user) {
         await Notification.create({
           creator: req.user,
           type: "Like",
-          title: post.title ? post.title : "Liked your post",
-          userId: post.user._id,
+          title: "Liked your post",
+          userId: post.user,
           postId: postId,
         });
       }
