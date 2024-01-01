@@ -10,6 +10,7 @@ import AppStackNavigator from './navigations/AppStackNavigator';
 import {QueryClient, QueryClientProvider, useQuery} from 'react-query';
 import {storage} from './zustand/MMKV';
 import {GestureHandlerRootView} from 'react-native-gesture-handler';
+import {BottomSheetModalProvider} from '@gorhom/bottom-sheet';
 const queryClient = new QueryClient();
 function App() {
   const {isAuthenticated, setUser, user} = useAuthStore();
@@ -23,14 +24,16 @@ function App() {
   return (
     <>
       <GestureHandlerRootView style={{flex: 1}}>
-        <NavigationContainer>
-          <QueryClientProvider client={queryClient}>
-            <AppStackNavigator />
-          </QueryClientProvider>
-          {/* <Provider store={store}> */}
+        <BottomSheetModalProvider>
+          <NavigationContainer>
+            <QueryClientProvider client={queryClient}>
+              <AppStackNavigator />
+            </QueryClientProvider>
+            {/* <Provider store={store}> */}
 
-          {/* </Provider> */}
-        </NavigationContainer>
+            {/* </Provider> */}
+          </NavigationContainer>
+        </BottomSheetModalProvider>
       </GestureHandlerRootView>
     </>
   );

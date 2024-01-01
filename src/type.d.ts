@@ -1,4 +1,7 @@
+import {Timestamp} from 'react-native-reanimated/lib/typescript/reanimated2/commonTypes';
+
 type User = {
+  _id: string;
   user: User;
   email: string;
   password: string;
@@ -31,4 +34,6 @@ type Post = {
   image: string;
   previewImage: string;
   user: User;
+  createdAt: Date;
+  likes: Array;
 };

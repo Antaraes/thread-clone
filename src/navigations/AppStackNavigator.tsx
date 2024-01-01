@@ -8,19 +8,16 @@ import AuthStackNavigator from './AuthStackNavigator';
 import useAuthStore from '@/zustand/AuthStore';
 import TabStackNavigator from './TabStackNavigator';
 import {storage} from '@/zustand/MMKV';
-import ProfileScreen from '@/screens/ProfileScreen';
-import PostScreen from '@/screens/PostScreen';
 import SettingScreen from '@/screens/SettingScreen';
 
 const AppStackNavigator = () => {
   const Stack = createNativeStackNavigator<RootStackParamList>();
-  const {isAuthenticated} = useAuthStore();
-  const [user, setUser] = useState(storage.getString('user'));
-
-  useEffect(() => {}, [user]);
+  const {isAuthenticated, setUser: setUserStore} = useAuthStore();
+  const [user, setUser] = useState<User>(storage.getString('user'));
+  console.log(user);
   return (
     <Stack.Navigator
-      initialRouteName="AuthScreen"
+      initialRouteName="AppScreen"
       screenOptions={{
         headerShown: false,
       }}>
@@ -28,9 +25,13 @@ const AppStackNavigator = () => {
         <>
           <Stack.Screen name="AppScreen" component={TabStackNavigator} />
           <Stack.Screen name="SettingScreen" component={SettingScreen} />
+          <Stack.Screen name="AuthScreen" component={AuthStackNavigator} />
         </>
       ) : (
-        <Stack.Screen name="AuthScreen" component={AuthStackNavigator} />
+        <>
+          <Stack.Screen name="AuthScreen" component={AuthStackNavigator} />
+          <Stack.Screen name="AppScreen" component={TabStackNavigator} />
+        </>
       )}
     </Stack.Navigator>
   );

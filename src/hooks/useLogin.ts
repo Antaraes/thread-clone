@@ -11,6 +11,7 @@ import useAuthStore from '@/zustand/AuthStore';
 import {AuthStackParamList, RootStackParamList} from '@/navigations/type';
 import {z} from 'zod';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
+import {LoginSchema as LoginType} from '@/type';
 
 type FormField = z.infer<typeof LoginSchema>;
 
@@ -34,14 +35,14 @@ const useLogin = (
     resolver: zodResolver(LoginSchema),
   });
 
-  const mutation = useMutation((data: LoginSchema) => Login(data), {
+  const mutation = useMutation((data: LoginType) => Login(data), {
     onSuccess: async response => {
       startLoading();
       const userData = response?.data;
 
-      console.log(userData);
       if (userData && userData.accessToken) {
         // Save user data and token to storage
+
         await storage.set('user', JSON.stringify(userData.user));
         await storage.set('token', userData.accessToken);
         queryClient.setQueryData('user', userData);
@@ -56,7 +57,7 @@ const useLogin = (
 
         reset();
         setAuth();
-        navigation.navigate('AppScreen');
+        navigation.navigate('AppScreen', {screen: 'HomeScreen'});
       } else {
         await ToastAndroid.showWithGravity(
           'Invalid response data',

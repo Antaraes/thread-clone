@@ -1,3 +1,4 @@
+import React, {useEffect, useRef} from 'react';
 import {
   Image,
   ScrollView,
@@ -8,92 +9,101 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import React, {useEffect, useState} from 'react';
 import {SafeAreaView} from 'react-native-safe-area-context';
+import {useForm, Controller, useFieldArray} from 'react-hook-form';
 import useAuthStore from '@/zustand/AuthStore';
 import {AppScreenProps} from '@/navigations/type';
 import {useColorScheme} from 'nativewind';
 import ImageCropPicker from 'react-native-image-crop-picker';
 import {useMutation} from 'react-query';
 import {CreatePost} from '@/api';
+import {Post, User} from '@/type';
+import {useFocusEffect} from '@react-navigation/native';
 
 type Props = AppScreenProps<'CreatePostScreen'>;
-const PostScreen: React.FC<Props> = ({navigation, route}) => {
-  const {setAuth, setUser, startLoading, stopLoading, user} = useAuthStore();
+
+const PostScreen: React.FC<Props> = ({navigation}) => {
+  const {setAuth, startLoading, stopLoading, user} = useAuthStore();
   const {colorScheme} = useColorScheme();
-  const [activeIndex, setActiveIndex] = useState(0);
-  console.log(user);
-  const [post, setPost] = useState<Post[]>([
-    {
+  const HiddenInput = useRef();
+  const {control, handleSubmit, reset, setValue} = useForm<Post>({
+    defaultValues: {
       title: '',
-      previewImage: '',
       image: '',
-      user: user,
+      user: user as User,
     },
-  ]);
-  console.log(activeIndex);
-  console.log(user);
+  });
+  const {fields, append, remove, update} = useFieldArray({
+    control,
+    name: 'posts',
+  });
+
   const uploadImage = async (index: number) => {
     try {
       const image = await ImageCropPicker.openPicker({
         width: 200,
         height: 200,
         cropping: true,
-        compressImageQuality: 0.5,
+        compressImageQuality: 0.9,
         includeBase64: true,
       });
       if (image) {
-        setPost(prevPost => {
-          const updatedPost = [...prevPost];
-          updatedPost[index] = {
-            ...updatedPost[index],
-            image: image?.data,
-            previewImage: 'data:image/jpeg;base64,' + image.data,
-          };
-          return updatedPost;
+        update(index, {
+          ...fields[index],
+          image: image?.data,
+          previewImage: `data:image/jpeg;base64,${image.data}`,
         });
       }
+      console.log(
+        'index, image.path, fields[index]',
+        index,
+        image.path,
+        fields[index],
+      );
     } catch (error) {
       console.error('Error during image upload:', error);
-      return null;
     }
   };
-  const handleTitleChange = (index: number, text: string) => {
-    setPost(prevPost => {
-      const updatedPost = [...prevPost];
-      updatedPost[index] = {...updatedPost[index], title: text};
-      return updatedPost;
+
+  const removeThread = (index: number) => {
+    remove(index);
+  };
+
+  const addNewThread = () => {
+    if (
+      fields[fields.length - 1].title !== '' ||
+      fields[fields.length - 1].image !== ''
+    ) {
+      append({
+        title: '',
+        image: '',
+        previewImage: '',
+        user: user as User,
+      });
+    }
+  };
+
+  const initailableNewTread = () => {
+    append({
+      title: '',
+      image: '',
+      previewImage: '',
+      user: user as User,
     });
   };
-  const removeThread = (index: number) => {
-    if (post.length > 1) {
-      const updatedPost = [...post];
-      updatedPost.splice(index, 1);
-      setPost(updatedPost);
-      setActiveIndex(updatedPost.length - 1);
-      return updatedPost;
-    }
-  };
-  console.log('post.length', post.length);
-  const addNewThread = () => {
-    if (post[activeIndex].title !== '' || post[activeIndex].image !== '') {
-      setPost(prevPost => [
-        ...prevPost,
-        {title: '', image: '', previewImage: '', user: user.user as User},
-      ]);
-      setActiveIndex(post.length);
-    }
-  };
+  useEffect(() => {
+    initailableNewTread();
+  }, []);
   const mutation = useMutation((data: Post[]) => CreatePost(data), {
     onSuccess: async response => {
       startLoading();
-
       await ToastAndroid.showWithGravity(
         'Create Post Success',
         ToastAndroid.LONG,
         ToastAndroid.BOTTOM,
       );
       setAuth();
+      reset();
       navigation.navigate('AppScreen', {screen: 'HomeScreen'});
       stopLoading();
     },
@@ -111,14 +121,14 @@ const PostScreen: React.FC<Props> = ({navigation, route}) => {
       startLoading();
     },
   });
-  const createPost = () => {
-    console.log(post);
-    mutation.mutate(post);
+
+  const onSubmit = (data: Post[]) => {
+    mutation.mutate(data);
   };
 
   return (
-    <SafeAreaView className=" p-3 flex-1 bg-white dark:bg-black">
-      <View className=' dark:bg-black bg-white"'>
+    <SafeAreaView className="p-3 flex-1 bg-white dark:bg-black">
+      <View className='dark:bg-black bg-white"'>
         <View className="w-full flex-row items-center bg-white dark:bg-black ">
           <TouchableOpacity onPress={() => navigation.goBack()}>
             <Image
@@ -130,14 +140,16 @@ const PostScreen: React.FC<Props> = ({navigation, route}) => {
               tintColor={colorScheme === 'dark' ? 'white' : 'black'}
             />
           </TouchableOpacity>
-          <Text className="pl-4 text-[20px] font-[500] text-black dark:text-white">
+          <Text
+            className="pl-4 text-[20px] font-[500] text-black dark:text-white"
+            onPress={() => initailableNewTread()}>
             New Thread
           </Text>
         </View>
       </View>
       <ScrollView>
-        {post.map((item, index) => (
-          <View key={index}>
+        {fields.map((item, index) => (
+          <View key={item.id}>
             <View className="mt-3 flex-row bg-white dark:bg-black">
               <Image
                 source={{
@@ -154,7 +166,7 @@ const PostScreen: React.FC<Props> = ({navigation, route}) => {
                 borderRadius={100}
               />
               <View className="pl-3 ">
-                <View className="w-[70%] flex-row justify-between">
+                <View className="w-[65%] flex-row justify-between">
                   <Text className="text-black dark:text-white">
                     {item.user.name}
                   </Text>
@@ -169,13 +181,19 @@ const PostScreen: React.FC<Props> = ({navigation, route}) => {
                     />
                   </TouchableOpacity>
                 </View>
-                <TextInput
-                  className="text-black dark:text-white w-[60%]"
-                  placeholder="Stat a thread"
-                  placeholderTextColor={'#eee'}
-                  value={item.title}
-                  multiline
-                  onChangeText={text => handleTitleChange(index, text)}
+                <Controller
+                  control={control}
+                  render={({field}) => (
+                    <TextInput
+                      value={field.value}
+                      onChangeText={field.onChange}
+                      className="text-black dark:text-white w-[60%]"
+                      placeholder="Start a thread"
+                      placeholderTextColor={'#eee'}
+                      multiline
+                    />
+                  )}
+                  name={`posts[${index}].title`}
                 />
 
                 <TouchableOpacity onPress={() => uploadImage(index)}>
@@ -202,7 +220,7 @@ const PostScreen: React.FC<Props> = ({navigation, route}) => {
                 </TouchableOpacity>
               </View>
             </View>
-            {index === activeIndex && (
+            {index === fields.length - 1 && (
               <View
                 className={`flex-row  w-full  mt-5 ${
                   item.title === '' && item.image === ''
@@ -224,13 +242,13 @@ const PostScreen: React.FC<Props> = ({navigation, route}) => {
                   borderRadius={100}
                 />
                 <Text
-                  onPress={addNewThread}
+                  onPress={() => addNewThread()}
                   className="text-black dark:text-white pl-3">
                   Add new Thread
                 </Text>
               </View>
             )}
-            <TouchableOpacity onPress={() => createPost()}>
+            <TouchableOpacity onPress={handleSubmit(onSubmit)}>
               <Text className="text-red-600  ">Create Post</Text>
             </TouchableOpacity>
           </View>

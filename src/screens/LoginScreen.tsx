@@ -5,16 +5,24 @@ import {
   TouchableHighlight,
   TouchableWithoutFeedback,
   Keyboard,
+  ActivityIndicator,
 } from 'react-native';
 import React from 'react';
 import {AuthScreenProps} from '@/navigations/type';
 import useLogin from '@/hooks/useLogin';
 import {Controller} from 'react-hook-form';
+import useAuthStore from '@/zustand/AuthStore';
 
 type Props = AuthScreenProps<'LoginScreen'>;
 
 const LoginScreen: React.FC<Props> = ({navigation, route}) => {
   const {control, handleSubmit, onSubmit} = useLogin(navigation);
+  const {isLoading} = useAuthStore();
+  if (isLoading) {
+    <View className="bg-[#F1F4F8] flex-1 dark:bg-[#070A0E] justify-center items-center">
+      <ActivityIndicator animating={true} color={'#ffff'} />
+    </View>;
+  }
   return (
     <TouchableWithoutFeedback onPress={() => Keyboard.dismiss()}>
       <View className="flex-[1]  items-center justify-center">

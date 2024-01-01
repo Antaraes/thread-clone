@@ -13,5 +13,7 @@ export const GetAllUsers = async () => {
   }
 };
 export const GetUserDetails = async () => API.get('/me');
-export const followAndUnfolllow = async (folllowUserId: string) =>
-  API.put('/add-user');
+export const followAndUnfolllow = async (data: FollowAndUnfolllow) =>
+  API.put('/add-user', data);
+export const GetPosts = async () => API.get('/get-all-posts');
+export const GetAllNotifications = async () => API.get('/get-notifications');

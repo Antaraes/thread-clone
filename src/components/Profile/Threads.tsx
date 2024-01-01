@@ -3,8 +3,8 @@ import React from 'react';
 
 const Threads = () => {
   return (
-    <View>
-      <Text>Threads</Text>
+    <View style={{flex: 1, backgroundColor: 'white'}}>
+      <Text className="text-black dark:text-white">Threads</Text>
     </View>
   );
 };

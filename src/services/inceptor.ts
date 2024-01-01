@@ -3,7 +3,7 @@ import axios from 'axios';
 
 const API = axios.create({
   // baseURL: process.env.SERVER_PORT,
-  baseURL: 'http://10.1.40.184:8080/api/v1',
+  baseURL: 'http://10.1.40.47:8080/api/v1',
   withCredentials: true,
   // baseURL: 'https://threads-clone-ten.vercel.app/api/v1',
 });

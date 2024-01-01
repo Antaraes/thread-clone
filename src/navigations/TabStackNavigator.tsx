@@ -1,7 +1,7 @@
 // TabStackNavigator.tsx
 
 import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
-import React from 'react';
+import React, {useState} from 'react';
 import {AppStackParamList} from './type';
 import HomeScreen from '../screens/HomeScreen';
 import ProfileScreen from '@/screens/ProfileScreen';
@@ -19,6 +19,7 @@ const Stack = createNativeStackNavigator<AppStackParamList>();
 
 const TabStackNavigator: React.FC<Props> = props => {
   const {colorScheme} = useColorScheme();
+  const [barClose, setBarClose] = useState(false);
   return (
     <Tab.Navigator
       initialRouteName="HomeScreen"
@@ -29,11 +30,6 @@ const TabStackNavigator: React.FC<Props> = props => {
         tabBarStyle: {
           backgroundColor: colorScheme === 'dark' ? 'black' : 'white',
           height: 60,
-          position: 'absolute',
-          bottom: 16,
-          right: 16,
-          left: 16,
-          borderRadius: 20,
         },
       }}>
       <Tab.Screen
