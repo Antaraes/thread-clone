@@ -62,15 +62,58 @@ exports.createPost = catchAsyncErrors(async (req, res, next) => {
 });
 
 // get all posts
+// exports.getAllPosts = catchAsyncErrors(async (req, res, next) => {
+//   try {
+//     const posts = await Post.find()
+//       .sort({
+//         createdAt: -1,
+//       })
+//       .populate("user", ["email", "name", "avatar"]);
+
+//     res.status(201).json({ success: true, posts });
+//   } catch (error) {
+//     return next(new ErrorHandler(error.message, 400));
+//   }
+// });
 exports.getAllPosts = catchAsyncErrors(async (req, res, next) => {
   try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+
+    const startIndex = (page - 1) * limit;
+    const endIndex = page * limit;
+
     const posts = await Post.find()
       .sort({
         createdAt: -1,
       })
+      .skip(startIndex)
+      .limit(limit)
       .populate("user", ["email", "name", "avatar"]);
 
-    res.status(201).json({ success: true, posts });
+    const totalPosts = await Post.countDocuments();
+
+    const pagination = {};
+
+    if (endIndex < totalPosts) {
+      pagination.next = {
+        page: page + 1,
+        limit,
+      };
+    }
+
+    if (startIndex > 0) {
+      pagination.prev = {
+        page: page - 1,
+        limit,
+      };
+    }
+
+    res.status(200).json({
+      success: true,
+      posts,
+      pagination,
+    });
   } catch (error) {
     return next(new ErrorHandler(error.message, 400));
   }
@@ -79,18 +122,18 @@ exports.getAllPosts = catchAsyncErrors(async (req, res, next) => {
 // add or remove likes
 exports.updateLikes = catchAsyncErrors(async (req, res, next) => {
   try {
-    const postId = req.body.postId;
+    const { postId } = req.body;
 
     const loggedInUser = await getUserFromToken(req);
     const post = await Post.findById(postId);
 
-    const isLikedBefore = post.likes.find((item) => item.userId === loggedInUser._id);
-
+    const isLikedBefore = post.likes.some((item) => item.user.equals(loggedInUser._id));
+    console.log("isLikedBefore", isLikedBefore, "loggedInUser", loggedInUser);
     if (isLikedBefore) {
       await Post.findByIdAndUpdate(postId, {
         $pull: {
           likes: {
-            userId: loggedInUser._id,
+            user: loggedInUser._id,
           },
         },
       });
